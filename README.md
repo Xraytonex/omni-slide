@@ -11,6 +11,7 @@ v1 (this):
 
 - Import PDFs — each page becomes a slide (rendered in the browser with pdf.js).
 - Arrange slides on a grid by dragging (or select + Shift+arrows). Insert rows/columns, delete, set the start slide.
+- Undo/redo every edit in the editor (⌘Z / ⌘⇧Z, or Ctrl+Z / Ctrl+Y), including deleted slides.
 - Present mode: arrow keys (plus PageUp/PageDown/Space for clickers), swipe on touch, `M` for a minimap, `F` fullscreen, `Home` back to start, `Esc` to exit.
 - Everything is stored locally in the browser (IndexedDB). Decks can be exported/imported as `.omni` files (a zip of `deck.json` + images).
 

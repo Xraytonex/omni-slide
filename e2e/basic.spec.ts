@@ -114,3 +114,62 @@ test('editor keyboard: select, move with shift+arrows, delete', async ({ page })
   await page.getByRole('button', { name: 'Delete' }).click();
   await expect(page.locator('.cell.filled')).toHaveCount(1);
 });
+
+test('editor undo/redo: moves, deletes (with images), and renames', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('home-pdf-input').setInputFiles({
+    name: 'three.pdf',
+    mimeType: 'application/pdf',
+    buffer: await makePdf(3),
+  });
+  await expect(page.locator('.cell.filled')).toHaveCount(3);
+  const undo = page.getByRole('button', { name: 'Undo', exact: true });
+  const redo = page.getByRole('button', { name: 'Redo', exact: true });
+  const p2 = (await cell(page, 1, 0).getAttribute('data-slide'))!;
+  const p3 = (await cell(page, 2, 0).getAttribute('data-slide'))!;
+
+  // Undo a drag.
+  await dragCell(page, [2, 0], [0, 1]);
+  await expect(cell(page, 0, 1)).toHaveAttribute('data-slide', p3);
+  await undo.click();
+  await expect(cell(page, 2, 0)).toHaveAttribute('data-slide', p3);
+  await expect(redo).toBeEnabled();
+
+  // Delete p2, then bring it back with the keyboard shortcut.
+  await cell(page, 1, 0).click();
+  await page.keyboard.press('Delete');
+  await expect(page.locator('.cell.filled')).toHaveCount(2);
+  await expect(redo).toBeDisabled(); // a new change clears redo
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(cell(page, 1, 0)).toHaveAttribute('data-slide', p2);
+  await expect(cell(page, 1, 0).locator('img')).toBeVisible();
+
+  // The restored image is back in storage, not just in memory.
+  await page.reload();
+  await expect(page.locator('.cell.filled')).toHaveCount(3);
+  await expect(cell(page, 1, 0).locator('img')).toBeVisible();
+  await expect(undo).toBeDisabled(); // history doesn't survive a reload
+
+  // Redo re-applies a delete.
+  await cell(page, 1, 0).click();
+  await page.getByRole('button', { name: 'Delete' }).click();
+  await undo.click();
+  await expect(page.locator('.cell.filled')).toHaveCount(3);
+  await page.keyboard.press('ControlOrMeta+Shift+z');
+  await expect(page.locator('.cell.filled')).toHaveCount(2);
+  await undo.click();
+
+  // Typing a name is one undo step; a later edit after leaving the field is another.
+  const name = page.getByLabel('Deck name');
+  await name.selectText();
+  await name.pressSequentially('Talk');
+  await name.blur();
+  await name.press('End');
+  await name.pressSequentially('!');
+  await name.blur();
+  await expect(name).toHaveValue('Talk!');
+  await undo.click();
+  await expect(name).toHaveValue('Talk');
+  await undo.click();
+  await expect(name).toHaveValue('three');
+});

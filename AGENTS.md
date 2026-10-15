@@ -44,8 +44,10 @@ Playwright + `pdf-lib` (generates test PDFs) for e2e.
 src/model/types.ts    Deck / Slide / Pos types
 src/model/grid.ts     Pure grid logic: neighbor, moveSlide (swaps), insertRow/Column,
                       removeSlide, appendRow, normalize, setStart, posOf. Unit-tested.
+src/model/history.ts  Generic pure undo/redo stack (record/undo/redo, tag-based merging). Unit-tested.
 src/storage/db.ts     IndexedDB: `decks` store (Deck JSON) and `assets` store (image Blobs)
 src/storage/assetUrl.ts  Cached object URLs for assets + useAssetUrl hook
+src/storage/assetTrash.ts  syncAssets(prev, next): deletes/restores assets as slides leave/return
 src/storage/file.ts   .omni export/import (zip: deck.json + assets/<assetId>)
 src/import/index.ts   importFiles(): one new row per PDF; lazy-loads pdf.ts
 src/import/pdf.ts     pdf.js renders pages to WebP/PNG (~1920px long edge)
@@ -71,7 +73,13 @@ e2e/basic.spec.ts     End-to-end flow
 - `.omni` has a `version` field (currently 1). Changing the deck shape in an incompatible way means
   bumping it and migrating older files in `importDeckFile`. IndexedDB schema changes go through the
   `openDB` upgrade callback with a version bump.
-- Deleting a slide must also delete its asset (`deleteAsset` + `forgetAsset`).
+- Deleting a slide must also delete its asset. In the editor this is automatic: every deck change
+  goes through `commit()` (→ undo history → `syncAssets`), which deletes assets of slides that
+  disappeared from IndexedDB right away but keeps the blob in memory so undo can put it back.
+  Don't call `deleteAsset` yourself there, or undo will restore a slide with no image. Outside the
+  editor, call `deleteAsset` + `forgetAsset`.
+- In the editor, never set deck state directly: use `commit(next)` so the change is undoable. Pass
+  a tag (`commit(next, 'name')`) for rapid-fire edits that should undo as one step.
 
 ## Gotchas (learned the hard way)
 
@@ -86,7 +94,9 @@ e2e/basic.spec.ts     End-to-end flow
   navigating to the present route directly.
 - TypeScript is pinned to 5.9 because `typescript-eslint` doesn't support TS 6+/7 yet.
 - E2E uses `/opt/pw-browsers/chromium` if present (cloud containers), else `PW_CHROMIUM_PATH`,
-  else Playwright's own download. Don't run `playwright install` in the cloud container.
+  else Playwright's own download. Don't run `playwright install` in the cloud container. On a Mac
+  with Chrome, point `PW_CHROMIUM_PATH` at `Google Chrome.app/Contents/MacOS/Google Chrome` to run
+  e2e without downloading a browser.
 - Each Playwright browser context has its own IndexedDB, so tests don't share decks.
 
 ## Conventions
