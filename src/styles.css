@@ -132,6 +132,14 @@ input:focus-visible {
 .zoom input {
   width: 100px;
 }
+.undo-redo {
+  display: flex;
+  gap: 4px;
+}
+.undo-redo button {
+  padding: 6px 10px;
+  line-height: 1;
+}
 
 .error {
   margin: 12px 16px;
